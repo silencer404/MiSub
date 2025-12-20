@@ -36,8 +36,9 @@ if (process.env.TRUST_PROXY === 'true') {
     app.set('trust proxy', 1);
 }
 
-// 将数据库实例挂载到 app.locals
+// 将数据库实例和 COOKIE_SECRET 存储到 app.locals
 app.locals.db = db;
+app.locals.cookieSecret = COOKIE_SECRET;
 
 // 健康检查端点
 app.get('/api/health', (req, res) => {
@@ -48,14 +49,41 @@ app.get('/api/health', (req, res) => {
     });
 });
 
-// API 路由 (TODO: 从 functions/ 复用业务逻辑)
-app.use('/api', (req, res, next) => {
-    // 临时响应,实际路由需要从 functions/ 迁移
-    res.json({
-        message: 'MiSub Docker API',
-        note: 'API routes will be implemented by migrating logic from functions/ directory'
-    });
-});
+// 动态导入 Cloudflare Functions 路由
+const loadCloudflareRoutes = async () => {
+    try {
+        // 导入适配器
+        const { adaptCloudflareFunction } = await import('./middleware/cloudflare-adapter.js');
+
+        // 导入 Cloudflare Functions 的主处理器
+        const functionsModule = await import('../functions/[[path]].js');
+
+        // 使用适配器将 Cloudflare Functions 转换为 Express 中间件
+        const cloudflareHandler = adaptCloudflareFunction(functionsModule.onRequest);
+
+        // API 路由
+        app.use('/api', cloudflareHandler);
+
+        // 订阅路由
+        app.use('/sub', cloudflareHandler);
+
+        console.log('✅ Cloudflare Functions 路由已加载');
+    } catch (error) {
+        console.error('❌ 加载 Cloudflare Functions 路由失败:', error);
+
+        // 降级处理 - 返回错误信息
+        app.use('/api', (req, res) => {
+            res.status(503).json({
+                error: 'Service Unavailable',
+                message: 'API routes failed to load',
+                details: error.message
+            });
+        });
+    }
+};
+
+// 加载路由
+await loadCloudflareRoutes();
 
 // 静态文件服务 (前端构建产物)
 app.use(express.static(join(__dirname, '../dist')));
