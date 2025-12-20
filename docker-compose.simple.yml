@@ -1,0 +1,16 @@
+version: '3.8'
+
+services:
+  misub:
+    container_name: misub
+    image: ghcr.io/imzyb/misub:latest
+    ports:
+      - "3200:3200"
+    volumes:
+      - ./data:/app/data
+    environment:
+      - NODE_ENV=production
+      - PORT=3200
+      - ADMIN_PASSWORD=change_this_password
+      - DB_PATH=/app/data/misub.db
+    restart: unless-stopped

@@ -3,10 +3,7 @@ version: '3.8'
 services:
   misub:
     container_name: misub
-    build:
-      context: .
-      dockerfile: Dockerfile
-    image: misub:latest
+    image: ghcr.io/imzyb/misub:latest # 直接使用预构建镜像
     ports:
       - "3200:3200" # 后端服务端口
     volumes:
